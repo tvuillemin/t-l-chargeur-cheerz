@@ -1,0 +1,5 @@
+black
+ipdb
+mypy
+pylint
+types-requests
