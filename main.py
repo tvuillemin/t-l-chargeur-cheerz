@@ -2,6 +2,7 @@ import asyncio
 import json
 from dataclasses import dataclass
 from datetime import datetime
+from os import makedirs
 from typing import Any, List, Mapping
 
 import requests
@@ -47,14 +48,21 @@ async def main() -> None:
     await asyncio.wait(tasks)
 
 
+def create_folders():
+    makedirs("photos/originales", exist_ok=True)
+    makedirs("photos/filtrées", exist_ok=True)
+
+
 async def download_original_photo(ref: PhotoReference) -> None:
+    create_folders()
     with open(f"photos/originales/{ref.taken_at}", "wb") as originale:
         response = requests.get(ref.original_url, allow_redirects=True)
         originale.write(response.content)
 
 
 async def download_filtered_photo(ref: PhotoReference) -> None:
-    with open(f"photos/filtres/{ref.taken_at}", "wb") as filtre:
+    create_folders()
+    with open(f"photos/filtrées/{ref.taken_at}", "wb") as filtre:
         response = requests.get(ref.url, allow_redirects=True)
         filtre.write(response.content)
 
