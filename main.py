@@ -12,7 +12,7 @@ URL = "https://live.cheerz.com/galleries/7J1U8-c4576350ecf2d22b47ff4e6e7d2fee0d3
 
 
 @dataclass(frozen=True)
-class PhotoReference:
+class Photo:
     taken_at: datetime
     url: str
     original_url: str
@@ -25,6 +25,23 @@ class PhotoReference:
             original_url=photo_dict["original_url"],
         )
 
+    async def download_original(self) -> None:
+        self._create_folders()
+        with open(f"photos/originales/{self.taken_at}", "wb") as originale:
+            response = requests.get(self.original_url, allow_redirects=True)
+            originale.write(response.content)
+
+    async def download_filtered(self) -> None:
+        self._create_folders()
+        with open(f"photos/filtrées/{self.taken_at}", "wb") as filtre:
+            response = requests.get(self.url, allow_redirects=True)
+            filtre.write(response.content)
+
+    @staticmethod
+    def _create_folders():
+        makedirs("photos/originales", exist_ok=True)
+        makedirs("photos/filtrées", exist_ok=True)
+
 
 async def main() -> None:
     cheerz_page = requests.get(URL)
@@ -34,37 +51,18 @@ async def main() -> None:
     json_start = photo_script.find("{")
     photos_dict = json.loads(str(photo_script[json_start:]))
 
-    photo_references = [PhotoReference.from_dict(d) for d in photos_dict["photoData"]]
+    photos = [Photo.from_dict(d) for d in photos_dict["photoData"]]
 
     tasks: List[asyncio.Task] = []
-    for ref in photo_references:
+    for photo in photos:
         tasks.extend(
             [
-                asyncio.create_task(download_original_photo(ref)),
-                asyncio.create_task(download_filtered_photo(ref)),
+                asyncio.create_task(photo.download_original()),
+                asyncio.create_task(photo.download_filtered()),
             ]
         )
 
     await asyncio.wait(tasks)
-
-
-def create_folders():
-    makedirs("photos/originales", exist_ok=True)
-    makedirs("photos/filtrées", exist_ok=True)
-
-
-async def download_original_photo(ref: PhotoReference) -> None:
-    create_folders()
-    with open(f"photos/originales/{ref.taken_at}", "wb") as originale:
-        response = requests.get(ref.original_url, allow_redirects=True)
-        originale.write(response.content)
-
-
-async def download_filtered_photo(ref: PhotoReference) -> None:
-    create_folders()
-    with open(f"photos/filtrées/{ref.taken_at}", "wb") as filtre:
-        response = requests.get(ref.url, allow_redirects=True)
-        filtre.write(response.content)
 
 
 if __name__ == "__main__":
