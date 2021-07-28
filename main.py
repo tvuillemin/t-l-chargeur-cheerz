@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from os import makedirs
 from typing import Any, List, Mapping
+from urllib.request import urlopen, urlretrieve
 
-import requests
 from bs4 import BeautifulSoup
 
 URL = "https://live.cheerz.com/galleries/7J1U8-c4576350ecf2d22b47ff4e6e7d2fee0d37f1e5f5"
@@ -27,15 +27,11 @@ class Photo:
 
     async def download_original(self) -> None:
         self._create_folders()
-        with open(f"photos/originales/{self.taken_at}", "wb") as originale:
-            response = requests.get(self.original_url, allow_redirects=True)
-            originale.write(response.content)
+        urlretrieve(self.original_url, f"photos/originales/{self.taken_at}")
 
     async def download_filtered(self) -> None:
         self._create_folders()
-        with open(f"photos/filtrées/{self.taken_at}", "wb") as filtre:
-            response = requests.get(self.url, allow_redirects=True)
-            filtre.write(response.content)
+        urlretrieve(self.original_url, f"photos/filtrées/{self.taken_at}")
 
     @staticmethod
     def _create_folders():
@@ -44,9 +40,9 @@ class Photo:
 
 
 async def main() -> None:
-    cheerz_page = requests.get(URL)
+    cheerz_page = urlopen(URL).read()
     photo_script = next(
-        BeautifulSoup(cheerz_page.text, "html.parser").find_all("script")[2].children
+        BeautifulSoup(cheerz_page, "html.parser").find_all("script")[2].children
     )
     json_start = photo_script.find("{")
     photos_dict = json.loads(str(photo_script[json_start:]))
