@@ -1,10 +1,11 @@
-import asyncio
 import json
+from asyncio import Task, create_task, run, wait
 from dataclasses import dataclass
 from datetime import datetime
 from html.parser import HTMLParser
+from itertools import chain
 from os import makedirs
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 from urllib.request import urlopen, urlretrieve
 
 URL = "https://live.cheerz.com/galleries/7J1U8-c4576350ecf2d22b47ff4e6e7d2fee0d37f1e5f5"
@@ -18,7 +19,7 @@ class CheezPageParser(HTMLParser):
         self.inside_script = False
         self.photos_dict: Dict[str, Any] = {}
 
-    def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
+    def handle_starttag(self, tag: str, _: Any) -> None:
         if tag == "script":
             self.inside_script = True
 
@@ -42,38 +43,33 @@ class Photo:
             original_url=photo_dict["original_url"],
         )
 
-    async def download_original(self) -> None:
-        self._create_folders()
-        urlretrieve(self.original_url, f"photos/originales/{self.taken_at}")
-
-    async def download_filtered(self) -> None:
-        self._create_folders()
-        urlretrieve(self.original_url, f"photos/filtrées/{self.taken_at}")
-
-    @staticmethod
-    def _create_folders():
+    def get_download_tasks(self) -> List[Task]:
         makedirs("photos/originales", exist_ok=True)
         makedirs("photos/filtrées", exist_ok=True)
+        return [
+            create_task(self._download_original()),
+            create_task(self._download_filtered()),
+        ]
+
+    async def _download_original(self) -> None:
+        urlretrieve(self.original_url, f"photos/originales/{self.taken_at}")
+
+    async def _download_filtered(self) -> None:
+        urlretrieve(self.original_url, f"photos/filtrées/{self.taken_at}")
 
 
 async def main() -> None:
+    # Download the Cheerz page
     cheerz_page = urlopen(URL).read().decode()
+
+    # Parse the Cheerz page content
     parser = CheezPageParser()
     parser.feed(cheerz_page)
+    photos = (Photo.from_dict(d) for d in parser.photos_dict["photoData"])
 
-    photos = [Photo.from_dict(d) for d in parser.photos_dict["photoData"]]
-
-    tasks: List[asyncio.Task] = []
-    for photo in photos:
-        tasks.extend(
-            [
-                asyncio.create_task(photo.download_original()),
-                asyncio.create_task(photo.download_filtered()),
-            ]
-        )
-
-    await asyncio.wait(tasks)
+    # Create and wait for all the download tasks
+    await wait(chain.from_iterable(p.get_download_tasks() for p in photos))
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    run(main())
