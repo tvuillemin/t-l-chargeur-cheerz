@@ -1,14 +1,13 @@
 import json
+from argparse import ArgumentParser
 from asyncio import Task, create_task, run, wait
 from dataclasses import dataclass
 from datetime import datetime
 from html.parser import HTMLParser
-from itertools import chain
+from itertools import chain, islice
 from os import makedirs
 from typing import Any, Dict, List
 from urllib.request import urlopen, urlretrieve
-
-URL = "https://live.cheerz.com/galleries/7J1U8-c4576350ecf2d22b47ff4e6e7d2fee0d37f1e5f5"
 
 
 class CheezPageParser(HTMLParser):
@@ -59,13 +58,18 @@ class Photo:
 
 
 async def main() -> None:
+    # Parse the command line arguments
+    args_parser = ArgumentParser(description="Télécharger des photos Cheerz")
+    args_parser.add_argument("url", help="L'URL de la galerie")
+    args = args_parser.parse_args()
+
     # Download the Cheerz page
-    cheerz_page = urlopen(URL).read().decode()
+    cheerz_page = urlopen(args.url).read().decode()
 
     # Parse the Cheerz page content
-    parser = CheezPageParser()
-    parser.feed(cheerz_page)
-    photos = (Photo.from_dict(d) for d in parser.photos_dict["photoData"])
+    html_parser = CheezPageParser()
+    html_parser.feed(cheerz_page)
+    photos = (Photo.from_dict(d) for d in html_parser.photos_dict["photoData"])
 
     # Create and wait for all the download tasks
     await wait(chain.from_iterable(p.get_download_tasks() for p in photos))
