@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import json
 from argparse import ArgumentParser
 from asyncio import Task, create_task, run, wait
